@@ -38,16 +38,24 @@ mapM f (Cons x xs) = do
                  return $ Cons v (Val vs)
 
 instance (Eq a, Unifiable a) => Unifiable (LogicList (LogicVal a)) where
-  unify Nil         Nil         s = return s
-  unify (Cons x xs) (Cons y ys) s = unify x y s >>= unify xs ys
-  unify _           _           _ = mzero
-
+  unify xs ys = do
+    s <- getSubst
+    case (walk xs s, walk ys s) of
+      (xs'            , ys'            ) | xs' == ys' -> return ()
+      (Var id         , ys'            ) -> modifySubst (extendS (Var id) ys')
+      (xs'            , Var id         ) -> modifySubst (extendS (Var id) xs')
+      (Val (Cons x xs), Val (Cons y ys)) -> unify x y >> unify xs ys
+      _                                  -> mzero
 
 instance Reifiable a => Reifiable (LogicList (LogicVal a)) where
   reify lv = do
     s <- ask
     case walk lv s of
-      Val xs -> Val <$> mapM reify xs
+      Val Nil -> return $ Val Nil
+      Val (Cons x xs) -> do
+        x' <- reify x
+        xs' <- reify xs
+        return $ Val (Cons x' xs')
       Var id -> do
         rs <- get
         case Map.lookup id rs of
@@ -57,14 +65,14 @@ instance Reifiable a => Reifiable (LogicList (LogicVal a)) where
             modify (Map.insert id rname)
             return $ Var rname
 
-append :: Eq a
-       => LogicVal (LogicList a)
-       -> LogicVal (LogicList a)
-       -> LogicVal (LogicList a)
+append :: Unifiable a
+       => LogicVal (LogicList (LogicVal a))
+       -> LogicVal (LogicList (LogicVal a))
+       -> LogicVal (LogicList (LogicVal a))
        -> LogicComp ()
 append xs ys out = 
   msum [ do xs  ==@ Nil
-            out ==@ Nil
+            out === ys
        , do x   <- var
             xs' <- var
             res <- var
@@ -72,16 +80,26 @@ append xs ys out =
             out ==@ Cons x res
             append xs' ys res
        ]
-            
+
+testAppend :: LogicComp (LogicVal (LogicList (LogicVal Int)))
 testAppend = do x <- var
                 y <- var
                 z <- var
-                x ==@ fromList (map Val [1,2,3])
-                y ==@ fromList (map Val [4,5,6])
+                x ==@ fromList (map Val [1..3])
+                y ==@ fromList (map Val [4..6])
                 append x y z
                 return z
 
+testAppend2 :: LogicComp (LogicVal (LogicList (LogicVal Int)))
+testAppend2 = do x <- var
+                 y <- var
+                 z <- var
+                 x ==@ fromList (map Val [1..3])
+                 z ==@ fromList (map Val [1..6])
+                 append x y z
+                 return y
+
 testLList = do x <- var
                y <- var
-               fromList (map Val [(1 :: Integer)]) === fromList [x]
+               fromList (map Val [(1 :: Integer)]) @=@ fromList [x]
                return x
