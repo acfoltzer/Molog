@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PackageImports #-}
 
@@ -17,7 +18,11 @@ import Unsafe.Coerce
 type VarId = Integer
 
 data LogicVal a = Var VarId | Val a
-                deriving (Eq, Show)
+                deriving (Eq)
+
+instance Show a => Show (LogicVal a) where
+  show (Var id) = "_." ++ show id
+  show (Val x)  = show x
 
 data WrappedVal
 
@@ -109,7 +114,7 @@ testComp = do x <- var
 -- run :: LogicComp (LogicVar a) -> [Maybe a]
 run c = map reifyOne results
   where results = runStateT c emptyState
-        reifyOne (lv, (_, s)) = runReader (evalStateT (reify lv) emptyRS) s
+        reifyOne (lv, (_, s)) = runReader (evalStateT (unRC $ reify lv) emptyRS) s
            
 testComp2 :: LogicComp (LogicVal Int)
 testComp2 = do x <- var
@@ -127,38 +132,58 @@ testList = do x <- var
               y ==@ [Val 1, x, Val 8]
               return y
 
-data ReifiedVal a = ReiName VarId | ReiVal a
+testList2 = do x <- var
+               y <- var
+               y ==@ [Val 1, x, Val 8]
+               return y
 
-instance Show a => Show (ReifiedVal a) where
-  show (ReiName id) = "_." ++ show id
-  show (ReiVal x)   = show x
+testList3 = do x <- var
+               y <- var
+               z <- var
+               x ==@ [Val 1, Val 2, z]
+               y === x
+               return y
 
 type ReifySubst = Map VarId VarId
 
 emptyRS = Map.empty
 
-type ReifyComp a = StateT ReifySubst (Reader Subst) a
+newtype ReifyComp a = RC { unRC :: StateT ReifySubst (Reader Subst) a }
+    deriving (Functor, Monad, MonadReader Subst, MonadState ReifySubst)
 
 class Reifiable a where
-  reify :: LogicVal a -> (ReifyComp (ReifiedVal a))
+  reify :: LogicVal a -> (ReifyComp (LogicVal a))
   reify lv = do 
     s <- ask
     case walk lv s of
-      Val x -> return $ ReiVal x
+      Val x -> return $ Val x
       Var id -> do
         rs <- get
         case Map.lookup id rs of
-          Just rname -> return $ ReiName rname
+          Just rname -> return $ Var rname
           Nothing -> do 
             let rname = fromIntegral $ Map.size rs
             modify (Map.insert id rname)
-            return $ ReiName rname
+            return $ Var rname
 
 instance Reifiable Char
 instance Reifiable Int
 instance Reifiable Integer
 
-instance Reifiable a => Reifiable [a]
+instance Reifiable a => Reifiable [LogicVal a] where
+  reify lv = do
+    s <- ask
+    case walk lv s of
+      Val xs -> Val <$> mapM reify xs
+      Var id -> do
+        rs <- get
+        case Map.lookup id rs of
+          Just rname -> return $ Var rname
+          Nothing -> do 
+            let rname = fromIntegral $ Map.size rs
+            modify (Map.insert id rname)
+            return $ Var rname
+
 instance Reifiable a => Reifiable (LogicVal a)
 
 --instance Reifiable a => Reifiable [a] where
