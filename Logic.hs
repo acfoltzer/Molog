@@ -1,6 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE PackageImports #-}
+
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module Logic where
 
@@ -13,6 +16,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import Unsafe.Coerce
+
+import Text.Printf
+import qualified Debug.Trace as DT
 
 type VarId = Integer
 
@@ -49,36 +55,56 @@ walk (Var id) s = case Map.lookup id s of
                     Just (SubstVar id') -> walk (Var id') s
                     Just (SubstVal wrapped) -> Val (unsafeCoerce wrapped)
             
-x = Var 0 :: LogicVal Int
-y = Var 1 :: LogicVal Int
+testx = Var 0 :: LogicVal Int
+testy = Var 1 :: LogicVal Int
 
-s = extendS x y emptyS
-s' = extendS y (Val 5) s
+tests = extendS testx testy emptyS
+tests' = extendS testy (Val 5) tests
 
-test = walk x s'
+testWalk = walk testx tests'
 
-class Unifiable a where
-  unify :: a
-        -> a
-        -> Subst
-        -> Maybe Subst
+getSubst :: LogicComp Subst
+getSubst = snd <$> get
 
-instance Unifiable Integer where
-  unify x y s | x == y    = return s
-              | otherwise = mzero
+modifySubst :: (Subst -> Subst) -> LogicComp ()
+modifySubst f = modify (\(varId, s) -> (varId, f s))
 
-instance Eq a => Unifiable (LogicVal a) where
-  unify x y s = 
+class Eq a => Unifiable a where
+  unify :: LogicVal a
+        -> LogicVal a
+        -> LogicComp ()
+  unify x y = do
+    s <- getSubst
     case (walk x s, walk y s) of
-      (x', y') | x' == y' -> return s
-      (Var id, y')        -> return $ extendS (Var id) y' s
-      (x', Var id)        -> return $ extendS (Var id) x' s
-      _                   -> mzero
+      (x'    , y'    ) | x' == y' -> return ()
+      (Var id, y'    ) -> modifySubst (extendS (Var id) y')
+      (x'    , Var id) -> modifySubst (extendS (Var id) x')
+      _                -> mzero
 
-instance (Eq a, Unifiable a) => Unifiable [a] where
-  unify []     []     s = return s
-  unify (x:xs) (y:ys) s = unify x y s >>= unify xs ys
-  unify _      _      _ = mzero
+instance Unifiable Int
+instance Unifiable Integer
+instance Unifiable Char
+
+instance (Show a, Eq a) => Unifiable [a] where
+  unify xs ys = do
+    s <- getSubst
+    case (walk xs s, walk ys s) of
+      (xs'   , ys'   ) | xs' == ys' -> return ()
+      (Var id, ys'   ) -> modifySubst (extendS (Var id) ys')
+      (xs'   , Var id) -> modifySubst (extendS (Var id) xs')
+      _                -> mzero
+
+instance (Unifiable a) => Unifiable [LogicVal a] where
+  unify xs ys = do
+    s <- getSubst
+    case (walk xs s, walk ys s) of
+      (xs'     , ys'     ) | xs' == ys' -> return ()
+      (Var id  , ys'     ) -> modifySubst (extendS (Var id) ys')
+      (xs'     , Var id  ) -> modifySubst (extendS (Var id) xs')
+      ((Val xs), (Val ys)) -> zipWithM_' unify xs ys
+        where zipWithM_' f []     []     = return ()
+              zipWithM_' f (x:xs) (y:ys) = f x y >> zipWithM_' f xs ys
+              zipWithM_' f _      _      = mzero
 
 type LogicState = (VarId, Subst)
 
@@ -92,22 +118,19 @@ var = do id <- fst <$> get
          modify (\(id, s) -> (id+1, s))
          return $ Var id
 
-(===) :: Unifiable a => a -> a -> LogicComp ()
-x === y = do s <- snd <$> get
-             case unify x y s of
-               Nothing -> mzero
-               Just s' -> modify (\(id, _) -> (id, s'))
+(===) :: Unifiable a => LogicVal a -> LogicVal a -> LogicComp ()
+(===) = unify
 
-(==@) :: (Eq a) => LogicVal a -> a -> LogicComp ()
+(==@) :: (Unifiable a) => LogicVal a -> a -> LogicComp ()
 x ==@ y = x === Val y
 
-(@==) :: (Eq a) => a -> LogicVal a -> LogicComp ()
+(@==) :: (Unifiable a) => a -> LogicVal a -> LogicComp ()
 (@==) = flip (==@)
 
-(@=@) :: (Eq a) => a -> a -> LogicComp ()
+(@=@) :: (Unifiable a) => a -> a -> LogicComp ()
 x @=@ y = Val x === Val y
 
--- testComp :: LogicComp Int
+testComp :: LogicComp (LogicVal Int)
 testComp = do x <- var
               y <- var
               x === y
@@ -119,27 +142,33 @@ run c = map reifyOne results
   where results = runStateT c emptyState
         reifyOne (lv, (_, s)) = runReader (evalStateT (unRC $ reify lv) emptyRS) s
            
+
+
 testComp2 :: LogicComp (LogicVal Int)
 testComp2 = do x <- var
                (x ==@ 5) `mplus` (x ==@ 6)
                return x
 
+testComp3 :: LogicComp (LogicVal String)
 testComp3 = do x <- var
                x ==@ "foo"
 --               x ==@ 5 -- program rejected with this uncommented!
                return x
 
+testList :: LogicComp (LogicVal [LogicVal Int])
 testList = do x <- var
               y <- var
               x ==@ 5
               y ==@ [Val 1, x, Val 8]
               return y
 
+testList2 :: LogicComp (LogicVal [LogicVal Int])
 testList2 = do x <- var
                y <- var
                y ==@ [Val 1, x, Val 8]
                return y
 
+testList3 :: LogicComp (LogicVal [LogicVal Int])
 testList3 = do x <- var
                y <- var
                z <- var
@@ -172,6 +201,7 @@ class Reifiable a where
 instance Reifiable Char
 instance Reifiable Int
 instance Reifiable Integer
+instance Reifiable [a]
 
 instance Reifiable a => Reifiable [LogicVal a] where
   reify lv = do
