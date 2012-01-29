@@ -119,7 +119,7 @@ testComp = do x <- var
 -- run :: LogicComp (LogicVar a) -> [Maybe a]
 run c = map reifyOne results
   where results = runStateT c emptyState
-        reifyOne (lv, (_, s)) = evalStateT (reify lv) emptyRS
+        reifyOne (lv, (_, s)) = runReader (evalStateT (reify lv) emptyRS) s
            
 testComp2 :: LogicComp (LogicVar Int)
 testComp2 = do x <- var
