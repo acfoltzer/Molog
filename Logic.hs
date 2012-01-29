@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PackageImports #-}
@@ -63,6 +62,10 @@ class Unifiable a where
         -> a
         -> Subst
         -> Maybe Subst
+
+instance Unifiable Integer where
+  unify x y s | x == y    = return s
+              | otherwise = mzero
 
 instance Eq a => Unifiable (LogicVal a) where
   unify x y s = 
