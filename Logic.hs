@@ -16,18 +16,16 @@ import Unsafe.Coerce
 
 type VarId = Integer
 
-newtype LogicVar a = LV { varId :: VarId } deriving (Eq, Ord)
+data LogicVal a = Var VarId | Val a
+                deriving (Eq, Show)
 
-instance Show (LogicVar a) where
-  show _ = "<var>"
-
-newtype WrappedVal = SV ()
+data WrappedVal
 
 instance Show WrappedVal where
   show _ = "<val>"
 
-data SubstContents = SubstVar     VarId 
-                   | SubstVal     WrappedVal 
+data SubstContents = SubstVar VarId 
+                   | SubstVal WrappedVal 
                      deriving (Show)
 
 type Subst = Map VarId SubstContents
@@ -35,30 +33,25 @@ type Subst = Map VarId SubstContents
 emptyS :: Subst
 emptyS = Map.empty
 
-extendS :: LogicVar a -> LogicVal a -> Subst -> Subst
-extendS (LV id)  (Val val)     s = Map.insert id (SubstVal (unsafeCoerce val)) s
-extendS (LV id1) (Var (LV id2)) s = Map.insert id1 (SubstVar id2) s
-
-data LogicVal a = Var (LogicVar a) | Val a
-                deriving (Eq, Show)
+extendS :: LogicVal a -> LogicVal a -> Subst -> Subst
+extendS (Var id)  (Val val) s = Map.insert id (SubstVal (unsafeCoerce val)) s
+extendS (Var id1) (Var id2) s = Map.insert id1 (SubstVar id2) s
+extendS _         _         _ = error "cannot extend subst with a value"
 
 walk :: LogicVal a -> Subst -> LogicVal a
 walk (Val x) _ = Val x
-walk (Var (LV id)) s = case Map.lookup id s of
-                           Nothing -> Var (LV id)
-                           Just (SubstVar id') -> walk (Var (LV id')) s
-                           Just (SubstVal wrapped) -> Val (unsafeCoerce wrapped)
+walk (Var id) s = case Map.lookup id s of
+                    Nothing -> Var id
+                    Just (SubstVar id') -> walk (Var id') s
+                    Just (SubstVal wrapped) -> Val (unsafeCoerce wrapped)
             
-walk' :: LogicVar a -> Subst -> LogicVal a
-walk' = walk . Var
-       
-x = LV 0 :: LogicVar Int
-y = LV 1 :: LogicVar Int
+x = Var 0 :: LogicVal Int
+y = Var 1 :: LogicVal Int
 
-s = extendS x (Var y) emptyS
+s = extendS x y emptyS
 s' = extendS y (Val 5) s
 
-test = walk' x s'
+test = walk x s'
 
 class Unifiable a where
   unify :: a
@@ -70,8 +63,8 @@ instance Eq a => Unifiable (LogicVal a) where
   unify x y s = 
     case (walk x s, walk y s) of
       (x', y') | x' == y' -> return s
-      (Var var, y')      -> return $ extendS var y' s
-      (x', Var var)      -> return $ extendS var x' s
+      (Var id, y')        -> return $ extendS (Var id) y' s
+      (x', Var id)        -> return $ extendS (Var id) x' s
       _                   -> mzero
 
 instance (Eq a, Unifiable a) => Unifiable [a] where
@@ -86,10 +79,10 @@ emptyState = (0, emptyS)
 
 type LogicComp a = StateT LogicState [] a
 
-var :: LogicComp (LogicVar a)
+var :: LogicComp (LogicVal a)
 var = do id <- fst <$> get
          modify (\(id, s) -> (id+1, s))
-         return $ LV id
+         return $ Var id
 
 (===) :: Unifiable a => a -> a -> LogicComp ()
 x === y = do s <- snd <$> get
@@ -97,14 +90,11 @@ x === y = do s <- snd <$> get
                Nothing -> mzero
                Just s' -> modify (\(id, _) -> (id, s'))
 
-($=$) :: (Eq a) => LogicVar a -> LogicVar a -> LogicComp ()
-x $=$ y = Var x === Var y
+(==@) :: (Eq a) => LogicVal a -> a -> LogicComp ()
+x ==@ y = x === Val y
 
-($=@) :: (Eq a) => LogicVar a -> a -> LogicComp ()
-x $=@ y = Var x === Val y
-
-(@=$) :: (Eq a) => a -> LogicVar a -> LogicComp ()
-(@=$) = flip ($=@)
+(@==) :: (Eq a) => a -> LogicVal a -> LogicComp ()
+(@==) = flip (==@)
 
 (@=@) :: (Eq a) => a -> a -> LogicComp ()
 x @=@ y = Val x === Val y
@@ -112,8 +102,8 @@ x @=@ y = Val x === Val y
 -- testComp :: LogicComp Int
 testComp = do x <- var
               y <- var
-              x $=$ y
-              y $=@ 5
+              x === y
+              y ==@ 5
               return y
 
 -- run :: LogicComp (LogicVar a) -> [Maybe a]
@@ -121,20 +111,20 @@ run c = map reifyOne results
   where results = runStateT c emptyState
         reifyOne (lv, (_, s)) = runReader (evalStateT (reify lv) emptyRS) s
            
-testComp2 :: LogicComp (LogicVar Int)
+testComp2 :: LogicComp (LogicVal Int)
 testComp2 = do x <- var
-               (x $=@ 5) `mplus` (x $=@ 6)
+               (x ==@ 5) `mplus` (x ==@ 6)
                return x
 
 testComp3 = do x <- var
-               x $=@ "foo"
---               x $=@ 5 -- program rejected with this uncommented!
+               x ==@ "foo"
+--               x ==@ 5 -- program rejected with this uncommented!
                return x
 
 testList = do x <- var
               y <- var
-              x $=@ 5
-              y $=@ [Val 1, Var x, Val 8]
+              x ==@ 5
+              y ==@ [Val 1, x, Val 8]
               return y
 
 data ReifiedVal a = ReiName VarId | ReiVal a
@@ -150,12 +140,12 @@ emptyRS = Map.empty
 type ReifyComp a = StateT ReifySubst (Reader Subst) a
 
 class Reifiable a where
-  reify :: LogicVar a -> (ReifyComp (ReifiedVal a))
+  reify :: LogicVal a -> (ReifyComp (ReifiedVal a))
   reify lv = do 
     s <- ask
-    case walk' lv s of
+    case walk lv s of
       Val x -> return $ ReiVal x
-      Var (LV id) -> do
+      Var id -> do
         rs <- get
         case Map.lookup id rs of
           Just rname -> return $ ReiName rname
@@ -164,9 +154,11 @@ class Reifiable a where
             modify (Map.insert id rname)
             return $ ReiName rname
 
-
+instance Reifiable Char
+instance Reifiable Int
 instance Reifiable Integer
 
+instance Reifiable a => Reifiable [a]
 instance Reifiable a => Reifiable (LogicVal a)
 
 --instance Reifiable a => Reifiable [a] where
