@@ -81,6 +81,7 @@ class Eq a => Unifiable a where
       (x'    , Var id) -> modifySubst (extendS (Var id) x')
       _                -> mzero
 
+instance Unifiable Bool
 instance Unifiable Int
 instance Unifiable Integer
 instance Unifiable Char
@@ -105,6 +106,24 @@ instance (Unifiable a) => Unifiable [LogicVal a] where
         where zipWithM_' f []     []     = return ()
               zipWithM_' f (x:xs) (y:ys) = f x y >> zipWithM_' f xs ys
               zipWithM_' f _      _      = mzero
+
+instance (Unifiable a, Unifiable b) => Unifiable (a, b) where
+  unify x y = do
+    s <- getSubst
+    case (walk x s, walk y s) of
+      (x', y') | x' == y' -> return ()
+      (Var id, y') -> modifySubst (extendS (Var id) y')
+      (x', Var id) -> modifySubst (extendS (Var id) x')
+      _            -> mzero
+
+instance (Unifiable a, Unifiable b) => Unifiable (LogicVal a, LogicVal b) where
+  unify x y = do
+    s <- getSubst
+    case (walk x s, walk y s) of
+      (x', y') | x' == y' -> return ()
+      (Var id, y') -> modifySubst (extendS (Var id) y')
+      (x', Var id) -> modifySubst (extendS (Var id) x')
+      (Val (xf, xs), Val (yf, ys)) -> unify xf yf >> unify xs ys
 
 type LogicState = (VarId, Subst)
 
@@ -181,7 +200,7 @@ type ReifySubst = Map VarId VarId
 emptyRS = Map.empty
 
 newtype ReifyComp a = RC { unRC :: StateT ReifySubst (Reader Subst) a }
-    deriving (Functor, Monad, MonadReader Subst, MonadState ReifySubst)
+    deriving (Functor, Applicative, Monad, MonadReader Subst, MonadState ReifySubst)
 
 class Reifiable a where
   reify :: LogicVal a -> (ReifyComp (LogicVal a))
@@ -189,15 +208,9 @@ class Reifiable a where
     s <- ask
     case walk lv s of
       Val x -> return $ Val x
-      Var id -> do
-        rs <- get
-        case Map.lookup id rs of
-          Just rname -> return $ Var rname
-          Nothing -> do 
-            let rname = fromIntegral $ Map.size rs
-            modify (Map.insert id rname)
-            return $ Var rname
+      Var id -> reifyVar (Var id)
 
+instance Reifiable Bool
 instance Reifiable Char
 instance Reifiable Int
 instance Reifiable Integer
@@ -208,16 +221,20 @@ instance Reifiable a => Reifiable [LogicVal a] where
     s <- ask
     case walk lv s of
       Val xs -> Val <$> mapM reify xs
-      Var id -> do
-        rs <- get
-        case Map.lookup id rs of
-          Just rname -> return $ Var rname
-          Nothing -> do 
-            let rname = fromIntegral $ Map.size rs
-            modify (Map.insert id rname)
-            return $ Var rname
+      Var id -> reifyVar (Var id)
 
 instance Reifiable a => Reifiable (LogicVal a)
+
+reifyVar :: LogicVal a -> ReifyComp (LogicVal a)
+reifyVar (Var id) = do
+  rs <- get
+  case Map.lookup id rs of
+    Just rname -> return $ Var rname
+    Nothing -> do 
+      let rname = fromIntegral $ Map.size rs
+      modify (Map.insert id rname)
+      return $ Var rname
+reifyVar _ = error "reifyVar is only for fresh variables"                        
 
 --instance Reifiable a => Reifiable [a] where
 --  reify lv s = undefined

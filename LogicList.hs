@@ -37,7 +37,7 @@ mapM f (Cons x xs) = do
     Val xs -> do vs <- mapM f xs
                  return $ Cons v (Val vs)
 
-instance (Eq a, Unifiable a) => Unifiable (LogicList (LogicVal a)) where
+instance Unifiable a => Unifiable (LogicList (LogicVal a)) where
   unify xs ys = do
     s <- getSubst
     case (walk xs s, walk ys s) of
@@ -56,14 +56,7 @@ instance Reifiable a => Reifiable (LogicList (LogicVal a)) where
         x' <- reify x
         xs' <- reify xs
         return $ Val (Cons x' xs')
-      Var id -> do
-        rs <- get
-        case Map.lookup id rs of
-          Just rname -> return $ Var rname
-          Nothing -> do 
-            let rname = fromIntegral $ Map.size rs
-            modify (Map.insert id rname)
-            return $ Var rname
+      Var id -> reifyVar (Var id)
 
 append :: Unifiable a
        => LogicVal (LogicList (LogicVal a))
