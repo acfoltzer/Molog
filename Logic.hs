@@ -25,6 +25,10 @@ type VarId = Integer
 data LogicVal a = Var VarId | Val a
                 deriving (Eq)
 
+instance Functor LogicVal where
+  fmap f (Var id) = Var id
+  fmap f (Val x)  = Val (f x)
+
 instance Show a => Show (LogicVal a) where
   show (Var id) = "_." ++ show id
   show (Val x)  = show x
@@ -86,7 +90,7 @@ instance Unifiable Int
 instance Unifiable Integer
 instance Unifiable Char
 
-instance (Show a, Eq a) => Unifiable [a] where
+instance Unifiable a => Unifiable [a] where
   unify xs ys = do
     s <- getSubst
     case (walk xs s, walk ys s) of

@@ -16,28 +16,34 @@ import qualified Data.Map as Map
 import Prelude hiding (mapM)
 
 data LogicList a = Nil
-                 | Cons a (LogicVal (LogicList a))
+                 | Cons (LogicVal a) (LogicVal (LogicList a))
                    deriving (Eq, Show)
 
 instance Functor LogicList where
-  fmap _ Nil               = Nil
-  fmap f (Cons x (Var id)) = Cons (f x) (Var id)
-  fmap f (Cons x (Val xs)) = Cons (f x) (Val (fmap f xs))
+  fmap _ Nil                  = Nil
+  fmap f (Cons hd tl) = Cons (f <$> hd) ((fmap f) <$> tl)
 
 fromList :: [a] -> LogicList a
 fromList []     = Nil
-fromList (x:xs) = Cons x (Val $ fromList xs)
+fromList (x:xs) = Cons (Val x) (Val $ fromList xs)
+
+toList :: LogicList a -> Maybe [a]
+toList Nil                     = return []
+toList (Cons (Val x) (Val xs)) = (:) x <$> toList xs
+toList _                       = mzero
 
 mapM :: Monad m => (a -> m b) -> LogicList a -> m (LogicList b)
 mapM _ Nil       = return Nil
 mapM f (Cons x xs) = do 
-  v <- f x
+  v <- case x of
+         Var id -> return $ Var id
+         Val x  -> do v <- f x; return $ Val v
   case xs of
     Var id -> return $ Cons v (Var id)
     Val xs -> do vs <- mapM f xs
                  return $ Cons v (Val vs)
 
-instance Unifiable a => Unifiable (LogicList (LogicVal a)) where
+instance Unifiable a => Unifiable (LogicList a) where
   unify xs ys = do
     s <- getSubst
     case (walk xs s, walk ys s) of
@@ -59,9 +65,9 @@ instance Reifiable a => Reifiable (LogicList (LogicVal a)) where
       Var id -> reifyVar (Var id)
 
 append :: Unifiable a
-       => LogicVal (LogicList (LogicVal a))
-       -> LogicVal (LogicList (LogicVal a))
-       -> LogicVal (LogicList (LogicVal a))
+       => LogicVal (LogicList a)
+       -> LogicVal (LogicList a)
+       -> LogicVal (LogicList a)
        -> LogicComp ()
 append xs ys out = 
   msum [ do xs  ==@ Nil
@@ -74,25 +80,26 @@ append xs ys out =
             append xs' ys res
        ]
 
-testAppend :: LogicComp (LogicVal (LogicList (LogicVal Int)))
+testAppend :: LogicComp (LogicVal (LogicList Int))
 testAppend = do x <- var
                 y <- var
                 z <- var
-                x ==@ fromList (map Val [1..3])
-                y ==@ fromList (map Val [4..6])
+                x ==@ fromList [1..3]
+                y ==@ fromList [4..6]
                 append x y z
                 return z
 
-testAppend2 :: LogicComp (LogicVal (LogicList (LogicVal Int)))
+testAppend2 :: LogicComp (LogicVal (LogicList Int))
 testAppend2 = do x <- var
                  y <- var
                  z <- var
-                 x ==@ fromList (map Val [1..3])
-                 z ==@ fromList (map Val [1..6])
+                 x ==@ fromList [1..3]
+                 z ==@ fromList [1..6]
                  append x y z
                  return y
 
+testLList :: LogicComp (LogicVal Integer)
 testLList = do x <- var
                y <- var
-               fromList (map Val [(1 :: Integer)]) @=@ fromList [x]
+               fromList [1] @=@ Cons x (Val Nil)
                return x

@@ -86,7 +86,7 @@ instance Reifiable Typ where
       Val x -> return $ Val x
       Var id -> reifyVar (Var id)      
 
-type TypEnv = LogicList (LogicVal (LogicVal Variable, LogicVal Typ))
+type TypEnv = LogicList (LogicVal Variable, LogicVal Typ)
 
 lookupEnv :: LogicVal Variable
           -> LogicVal TypEnv
