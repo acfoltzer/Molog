@@ -15,4 +15,5 @@ Library
                      , Language.Logic.Examples.Infer
   Build-depends:       base == 4.*
                      , containers == 0.4.*
+                     , logict == 0.5.*
                      , mtl == 2.0.*

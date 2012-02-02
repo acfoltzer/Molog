@@ -9,6 +9,7 @@ module Language.Logic where
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Logic
 import "mtl" Control.Monad.Reader
 import "mtl" Control.Monad.State
 
@@ -134,7 +135,7 @@ type LogicState = (VarId, Subst)
 emptyState :: LogicState
 emptyState = (0, emptyS)
 
-type LogicComp a = StateT LogicState [] a
+type LogicComp a = StateT LogicState Logic a
 
 var :: LogicComp (LogicVal a)
 var = do id <- fst <$> get
@@ -160,12 +161,11 @@ testComp = do x <- var
               y ==@ 5
               return y
 
--- run :: LogicComp (LogicVar a) -> [Maybe a]
+run :: Reifiable a => LogicComp (LogicVal a) -> [LogicVal a]
 run c = map reifyOne results
-  where results = runStateT c emptyState
-        reifyOne (lv, (_, s)) = runReader (evalStateT (unRC $ reify lv) emptyRS) s
-           
-
+  where results = observeAll $ runStateT c emptyState
+        reifyOne (lv, (_, s)) = 
+          runReader (evalStateT (unRC $ reify lv) emptyRS) s          
 
 testComp2 :: LogicComp (LogicVal Int)
 testComp2 = do x <- var
