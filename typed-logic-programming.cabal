@@ -1,0 +1,18 @@
+Name:                typed-logic-programming
+Version:             0.1.0
+Synopsis:            Typed logic programming embedded in Haskell
+License:             BSD3
+License-file:        LICENSE
+Author:              Adam C. Foltzer
+Maintainer:          acfoltzer@gmail.com
+Category:            Language
+Build-type:          Simple
+Cabal-version:       >=1.8
+
+Library
+  Exposed-modules:     Language.Logic
+                     , Language.Logic.LogicList
+                     , Language.Logic.Examples.Infer
+  Build-depends:       base == 4.*
+                     , containers == 0.4.*
+                     , mtl == 2.0.*
