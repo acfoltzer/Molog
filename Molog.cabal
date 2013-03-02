@@ -1,6 +1,6 @@
-Name:                typed-logic-programming
+Name:                Molog
 Version:             0.1.0
-Synopsis:            Typed logic programming embedded in Haskell
+Synopsis:            Molog: Typed Logic Programming
 License:             BSD3
 License-file:        LICENSE
 Author:              Adam C. Foltzer
@@ -13,7 +13,7 @@ Library
   Exposed-modules:     Language.Logic
                      , Language.Logic.LogicList
                      , Language.Logic.Examples.Infer
-  Build-depends:       base == 4.*
-                     , containers == 0.4.*
-                     , logict == 0.5.*
-                     , mtl == 2.0.*
+  Build-depends:       base >= 4
+                     , containers >= 0.4
+                     , logict >= 0.5
+                     , mtl >= 2.1
