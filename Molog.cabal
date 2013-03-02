@@ -10,10 +10,10 @@ Build-type:          Simple
 Cabal-version:       >=1.8
 
 Library
-  Exposed-modules:     Language.Logic
-                     , Language.Logic.LogicList
-                     , Language.Logic.Examples.Infer
+  Exposed-modules:     Molog
+                     , Molog.Prelude
   Build-depends:       base >= 4
                      , containers >= 0.4
                      , logict >= 0.5
                      , mtl >= 2.1
+  Hs-source-dirs:    src

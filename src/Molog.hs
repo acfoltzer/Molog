@@ -6,7 +6,7 @@
 
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module Language.Logic where
+module Molog where
 
 import Control.Applicative
 import Control.Monad

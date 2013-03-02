@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PackageImports #-}
 
-module Language.Logic.LogicList where
+module Molog.Prelude where
 
-import Language.Logic
+import Molog
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
