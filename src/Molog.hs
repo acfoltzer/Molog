@@ -17,6 +17,7 @@ import Control.Monad.Logic
 import Control.Monad.Ref
 import Control.Monad.ST.Persistent
 
+import Data.Maybe
 import Data.STRef.Persistent
 
 newtype Molog s a = M { unM :: STT s Logic a }
@@ -98,31 +99,6 @@ instance (Unifiable s a, Unifiable s b) => Unifiable s (Term s a, Term s b) wher
   unify x y = unifyWith unifyPairs x y
     where --unifyPairs :: (Term s a, Term s b) -> (Term s a, Term s b) -> Molog s ()
           unifyPairs (x1, y1) (x2, y2) = unify x1 x2 >> unify y1 y2
-
-
-test :: Molog s (Term s Int)
-test = do x <- fresh
-          y <- fresh
-          x `unify` (Val 5)
-          x `unify` y
-          return y
-
-test1 :: Molog s (Term s (Term s Int, Term s Int))
-test1 = do x <- fresh
-           y <- fresh
-           x `unify` (Val 5)
-           x `unify` y
-           p <- fresh
-           p `unify` (Val (x, y))
-           return p
-
-test2 :: Molog s (Term s Int)
-test2 = do x <- fresh
-           msum [ x `unify` (Val 5)
-                , x `unify` (Val 5) >> x `unify` (Val 6)
-                , x `unify` (Val 6)
-                ]
-           return x
 
 class Reifiable s a b | a -> b where
   reify :: a -> Molog s (Maybe b)

@@ -1,5 +1,5 @@
 Name:                Molog
-Version:             0.1.0
+Version:             0.1
 Synopsis:            Molog: Typed Logic Programming
 License:             BSD3
 License-file:        LICENSE
@@ -10,12 +10,24 @@ Build-type:          Simple
 Cabal-version:       >=1.8
 
 Library
-  Exposed-modules:     Molog
-                     , Molog.Prelude
-  Build-depends:       base >= 4
-                     , containers >= 0.4
-                     , logict >= 0.5
-                     , mtl >= 2.1
-                     , persistent-refs >= 0.3
-                     , ref-fd >= 0.3
+  Exposed-modules:   Molog
+--                     Molog.Prelude
+  Build-depends:     base            >= 4 && < 5,
+                     containers      >= 0.4,
+                     logict          >= 0.5,
+                     mtl             >= 2.1,
+                     persistent-refs >= 0.3,
+                     ref-fd          >= 0.3
   Hs-source-dirs:    src
+
+Test-Suite Tests
+  Type:		     exitcode-stdio-1.0
+  hs-source-dirs:    test
+  Main-is:	     Tests.hs
+  Build-depends:     base                 >= 4 && < 5,
+                     HUnit                >= 1.2,
+                     test-framework       >= 0.8,
+                     test-framework-hunit >= 0.3,
+                     test-framework-th    >= 0.2,
+                     Molog
+
