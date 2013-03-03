@@ -22,12 +22,11 @@ Library
 
 Test-Suite Tests
   Type:		     exitcode-stdio-1.0
-  hs-source-dirs:    test
+  hs-source-dirs:    test, src
   Main-is:	     Tests.hs
   Build-depends:     base                 >= 4 && < 5,
                      HUnit                >= 1.2,
                      test-framework       >= 0.8,
                      test-framework-hunit >= 0.3,
-                     test-framework-th    >= 0.2,
-                     Molog
+                     test-framework-th    >= 0.2
 
