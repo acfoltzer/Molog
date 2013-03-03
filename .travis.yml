@@ -2,4 +2,4 @@ language: haskell
 
 before_install: cabal update
 
-install: cabal install --only-dependencies --enable-tests
+install: cabal install --only-dependencies --enable-tests --force-reinstalls
