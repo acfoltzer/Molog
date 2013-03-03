@@ -25,6 +25,11 @@ Test-Suite Tests
   hs-source-dirs:    test, src
   Main-is:	     Tests.hs
   Build-depends:     base                 >= 4 && < 5,
+                     containers           >= 0.4,
+                     logict               >= 0.5,
+                     mtl                  >= 2.1,
+                     persistent-refs      >= 0.3,
+                     ref-fd               >= 0.3,
                      HUnit                >= 1.2,
                      test-framework       >= 0.8,
                      test-framework-hunit >= 0.3,
