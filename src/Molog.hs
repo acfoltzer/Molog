@@ -127,6 +127,12 @@ instance (Reifiable s a c, Reifiable s b d) => Reifiable s (a, b) (c, d) where
       (Just x', Just y') -> return (Just (x', y'))
       _                  -> return Nothing
 
+reify' :: Reifiable s a b => a -> Molog s b
+reify' x = do mx' <- reify x
+              case mx' of
+                Nothing -> mzero
+                Just x' -> return x'
+
 runMolog :: (forall s . Molog s a) -> [a]
 runMolog c = observeAll (runSTT (unM c))
 
