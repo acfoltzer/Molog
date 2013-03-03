@@ -16,4 +16,6 @@ Library
                      , containers >= 0.4
                      , logict >= 0.5
                      , mtl >= 2.1
+                     , persistent-refs >= 0.3
+                     , ref-fd >= 0.3
   Hs-source-dirs:    src
