@@ -7,7 +7,7 @@ Author:              Adam C. Foltzer
 Maintainer:          acfoltzer@gmail.com
 Category:            Language
 Build-type:          Simple
-Cabal-version:       >=1.8
+Cabal-version:       >=1.14
 
 Library
   Exposed-modules:   Molog
